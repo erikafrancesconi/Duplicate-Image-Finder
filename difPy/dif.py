@@ -67,24 +67,29 @@ class dif:
                                                       ref, show_output, show_progress)
           else:
             current_file = file[0]
-            current_matrix = dif._create_files_matrix([current_file], px_size, False)
+            current_matrix = dif._create_files_matrix([current_file], px_size, False)[0]
             idx_from = 0
-            idx_to = 100
+            idx_to = 0
+            file_searched = 0
+            num_duplicates = 0
+            result = {}
 
             while idx_to < len(file):
+              idx_to += 100
               img_matrices_A = dif._create_files_matrix(file[idx_from:idx_to], px_size, show_progress)
               ref = dif._map_similarity(similarity)
               result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file, 
-                                                        ref, show_output, show_progress)
+                                                        ref, show_output, show_progress, result)
 
               idx_from += 100
-              idx_to += 100
+              file_searched += total
+              num_duplicates += len(result)
 
         end_time = time.time()
         time_elapsed = np.round(end_time - start_time, 4)
         stats = dif._generate_stats(directory_A, directory_B, 
                                     time.localtime(start_time), time.localtime(end_time), time_elapsed, 
-                                    similarity, total, len(result))
+                                    similarity, file_searched, num_duplicates)
 
         self.result = result
         self.lower_quality = lower_quality
@@ -224,9 +229,8 @@ class dif:
         return imgs_matrix, folder_files
 
     # Function that searches one file for duplicate/similar images
-    def _search_one_file(file_matrix, filepath, img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False):
+    def _search_one_file(file_matrix, filepath, img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False, result={}):
         total = len(img_matrices_A)
-        result = {}
         lower_quality = []
         ref = similarity
 
