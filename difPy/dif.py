@@ -60,28 +60,25 @@ class dif:
         file = dif._process_file(file)
 
         if len(file) > 0:
-          img_matrices_A = dif._create_files_matrix(file[0:100], px_size, show_progress)
-          ref = dif._map_similarity(similarity)
-          result, lower_quality, total = dif._search_one_file(img_matrices_A[0], file[0], img_matrices_A, file, 
-                                                    ref, show_output, show_progress)
+          if len(file) <= 100:
+            img_matrices_A = dif._create_files_matrix(file, px_size, show_progress)
+            ref = dif._map_similarity(similarity)
+            result, lower_quality, total = dif._search_all_files(img_matrices_A, file, 
+                                                      ref, show_output, show_progress)
+          else:
+            current_file = file[0]
+            current_matrix = dif._create_files_matrix([current_file], px_size, False)
+            idx_from = 0
+            idx_to = 100
 
-        # if directory_B == None:
-        #     # process one directory
-        #     directory_A = dif._process_directory(directory_A)
-        #     img_matrices_A, folderfiles_A = dif._create_imgs_matrix(directory_A, px_size, show_progress)
-        #     ref = dif._map_similarity(similarity)
-        #     result, lower_quality, total = dif._search_one_dir(img_matrices_A, folderfiles_A, 
-        #                                                        ref, show_output, show_progress)
-        # else:
-        #     # process two directories
-        #     directory_A = dif._process_directory(directory_A)
-        #     directory_B = dif._process_directory(directory_B)
-        #     img_matrices_A, folderfiles_A = dif._create_imgs_matrix(directory_A, px_size, show_progress)
-        #     img_matrices_B, folderfiles_B = dif._create_imgs_matrix(directory_B, px_size, show_progress)
-        #     ref = dif._map_similarity(similarity)
-        #     result, lower_quality, total = dif._search_two_dirs(img_matrices_A, folderfiles_A,
-        #                                                         img_matrices_B, folderfiles_B,
-        #                                                         ref, show_output, show_progress)
+            while idx_to < len(file):
+              img_matrices_A = dif._create_files_matrix(file[idx_from:idx_to], px_size, show_progress)
+              ref = dif._map_similarity(similarity)
+              result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file, 
+                                                        ref, show_output, show_progress)
+
+              idx_from += 100
+              idx_to += 100
 
         end_time = time.time()
         time_elapsed = np.round(end_time - start_time, 4)
@@ -226,23 +223,24 @@ class dif:
 
         return imgs_matrix, folder_files
 
-        # Function that searches one directory for duplicate/similar images
+    # Function that searches one file for duplicate/similar images
     def _search_one_file(file_matrix, filepath, img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False):
-
         total = len(img_matrices_A)
         result = {}
         lower_quality = []
         ref = similarity
 
-        # find duplicates/similar images within one folder
+        img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        while img_id in result.keys():
+            img_id = str(int(img_id) + 1)
+
         for count_A, imageMatrix_A in enumerate(img_matrices_A):
-            img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
-            while img_id in result.keys():
-                img_id = str(int(img_id) + 1)
             if show_progress:
                 dif._show_progress(count_A, img_matrices_A, task='comparing images')
-            # for count_B, imageMatrix_B in enumerate(img_matrices_A):
-            #     if count_B > count_A and count_A != len(img_matrices_A):
+
+            if folderfiles_A[count_A] == filepath:
+              continue
+
             rotations = 0
             while rotations <= 3:
                 if rotations != 0:
@@ -267,6 +265,51 @@ class dif:
                     break
                 else:
                     rotations += 1
+                            
+        result = collections.OrderedDict(sorted(result.items()))
+        lower_quality = list(set(lower_quality))
+        
+        return result, lower_quality, total
+
+    def _search_all_files(img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False):
+        total = len(img_matrices_A)
+        result = {}
+        lower_quality = []
+        ref = similarity
+
+        # find duplicates/similar images within one folder
+        for count_A, imageMatrix_A in enumerate(img_matrices_A):
+            img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+            while img_id in result.keys():
+                img_id = str(int(img_id) + 1)
+            if show_progress:
+                dif._show_progress(count_A, img_matrices_A, task='comparing images')
+            for count_B, imageMatrix_B in enumerate(img_matrices_A):
+                if count_B > count_A and count_A != len(img_matrices_A):
+                    rotations = 0
+                    while rotations <= 3:
+                        if rotations != 0:
+                            imageMatrix_B = dif._rotate_img(imageMatrix_B)
+
+                        err = dif._mse(imageMatrix_A, imageMatrix_B)
+                        if err < ref:
+                            if show_output:
+                                # dif._show_img_figs(imageMatrix_A, imageMatrix_B, err)
+                                dif._show_file_info(Path(folderfiles_A[count_A]), #0 is the path, 1 is the filename
+                                                    Path(folderfiles_A[count_B]))
+                            if img_id in result.keys():
+                                result[img_id]["duplicates"] = result[img_id]["duplicates"] + [str(Path(folderfiles_A[count_B]))]
+                            else:
+                                result[img_id] = {'filename': str(folderfiles_A[count_A]),
+                                                  'duplicates': [str(Path(folderfiles_A[count_B]))]}
+                            try:                                    
+                                high, low = dif._check_img_quality(Path(folderfiles_A[count_A]), Path(folderfiles_A[count_B]))
+                                lower_quality.append(str(low))
+                            except:
+                                pass
+                            break
+                        else:
+                            rotations += 1
                             
         result = collections.OrderedDict(sorted(result.items()))
         lower_quality = list(set(lower_quality))
