@@ -59,27 +59,32 @@ class dif:
 
         file = dif._process_file(file)
 
+        file_searched = 0
+        num_duplicates = 0
+
         if len(file) > 0:
           if len(file) <= 100:
             img_matrices_A = dif._create_files_matrix(file, px_size, show_progress)
             ref = dif._map_similarity(similarity)
             result, lower_quality, total = dif._search_all_files(img_matrices_A, file, 
                                                       ref, show_output, show_progress)
+            file_searched += total
+            num_duplicates += len(result)
+
           else:
             current_file = file[0]
             current_matrix = dif._create_files_matrix([current_file], px_size, False)[0]
+            img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
             idx_from = 0
             idx_to = 0
-            file_searched = 0
-            num_duplicates = 0
             result = {}
 
             while idx_to < len(file):
               idx_to += 100
               img_matrices_A = dif._create_files_matrix(file[idx_from:idx_to], px_size, show_progress)
               ref = dif._map_similarity(similarity)
-              result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file, 
-                                                        ref, show_output, show_progress, result)
+              result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file[idx_from:idx_to], 
+                                                        ref, show_output, show_progress, result, img_id)
 
               idx_from += 100
               file_searched += total
@@ -229,20 +234,16 @@ class dif:
         return imgs_matrix, folder_files
 
     # Function that searches one file for duplicate/similar images
-    def _search_one_file(file_matrix, filepath, img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False, result={}):
+    def _search_one_file(file_matrix, filepath, img_matrices_A, folderfiles_A, similarity, show_output=False, show_progress=False, result={}, img_id=datetime.now().strftime("%Y%m%d%H%M%S%f")):
         total = len(img_matrices_A)
         lower_quality = []
         ref = similarity
-
-        img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
-        while img_id in result.keys():
-            img_id = str(int(img_id) + 1)
 
         for count_A, imageMatrix_A in enumerate(img_matrices_A):
             if show_progress:
                 dif._show_progress(count_A, img_matrices_A, task='comparing images')
 
-            if folderfiles_A[count_A] == filepath:
+            if folderfiles_A[count_A] == filepath or (img_id in result and folderfiles_A[count_A] in result[img_id]["duplicates"]):
               continue
 
             rotations = 0
