@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 
 class dif:
 
-    def __init__(self, file, directory_A, directory_B=None, similarity="normal", px_size=50, show_progress=True, show_output=False, delete=False, silent_del=False, output_dir='output'):
+    def __init__(self, file, directory_A, directory_B=None, similarity="normal", px_size=50, show_progress=True, show_output=False, delete=False, silent_del=False, output_dir='output', from_line=0):
         """
         directory_A (str)........folder path to search for duplicate/similar images
         directory_B (str)........second folder path to search for duplicate/similar images
@@ -76,7 +76,7 @@ class dif:
             num_duplicates += len(result)
 
           else:
-            idx_processing = 0
+            idx_processing = from_line if from_line is not None else 0
             result = {}
             result['first_file'] = idx_processing
 
@@ -569,13 +569,14 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--delete", type=bool, help='(optional) Deletes all duplicate images with lower quality.', required=False, nargs='?', choices=[True, False], default=False)
     parser.add_argument("-D", "--silent_del", type=bool, help='(optional) Supresses the user confirmation when deleting images.', required=False, nargs='?', choices=[True, False], default=False)
     parser.add_argument("-F", "--file", type=str, help='Text file with a list of images to check.', required=True)
+    parser.add_argument("-l", "--from_line", type=int, help='File line to start checking.', required=False)
     args = parser.parse_args()
 
     # initialize difPy
     search = dif(file=args.file, directory_A=args.directory_A, directory_B=args.directory_B,
                  similarity=args.similarity, px_size=args.px_size, 
                  show_output=args.show_output, show_progress=args.show_progress, 
-                 delete=args.delete, silent_del=args.silent_del, output_dir="output")
+                 delete=args.delete, silent_del=args.silent_del, output_dir="output", from_line=args.from_line)
 
     # create filenames for the output files
     # timestamp =str(time.time()).replace(".", "_")
