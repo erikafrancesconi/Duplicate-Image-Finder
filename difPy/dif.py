@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 
 class dif:
 
-    def __init__(self, file, directory_A, directory_B=None, similarity="normal", px_size=50, show_progress=True, show_output=False, delete=False, silent_del=False):
+    def __init__(self, file, directory_A, directory_B=None, similarity="normal", px_size=50, show_progress=True, show_output=False, delete=False, silent_del=False, output_dir='output'):
         """
         directory_A (str)........folder path to search for duplicate/similar images
         directory_B (str)........second folder path to search for duplicate/similar images
@@ -59,6 +59,10 @@ class dif:
 
         file = dif._process_file(file)
 
+        # create filenames for the output files
+        timestamp =str(time.time()).replace(".", "_")
+        result_file = "difPy_results_" + timestamp + ".json"
+
         file_searched = 0
         num_duplicates = 0
 
@@ -72,23 +76,37 @@ class dif:
             num_duplicates += len(result)
 
           else:
-            current_file = file[0]
-            current_matrix = dif._create_files_matrix([current_file], px_size, False)[0]
-            img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
-            idx_from = 0
-            idx_to = 0
+            idx_processing = 0
             result = {}
+            result['first_file'] = idx_processing
 
-            while idx_to < len(file):
-              idx_to += 100
-              img_matrices_A = dif._create_files_matrix(file[idx_from:idx_to], px_size, show_progress)
-              ref = dif._map_similarity(similarity)
-              result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file[idx_from:idx_to], 
-                                                        ref, show_output, show_progress, result, img_id)
+            while idx_processing < len(file):
+              idx_from = 0
+              idx_to = 0
 
-              idx_from += 100
-              file_searched += total
-              num_duplicates += len(result)
+              current_file = file[idx_processing]
+
+              print(f"Processing file {current_file}... \r")
+              dif._show_progress(0, file, task='comparing images')
+
+              current_matrix = dif._create_files_matrix([current_file], px_size, False)[0]
+              img_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+              while idx_to < len(file):
+                idx_to += 100
+                img_matrices_A = dif._create_files_matrix(file[idx_from:idx_to], px_size, show_progress)
+                ref = dif._map_similarity(similarity)
+                result, lower_quality, total = dif._search_one_file(current_matrix, current_file, img_matrices_A, file[idx_from:idx_to], 
+                                                          ref, show_output, show_progress, result, img_id)
+
+                dif._show_progress(idx_to, file, task='comparing images')
+                idx_from += 101
+                file_searched += total
+                num_duplicates += len(result)
+
+              result['last_file'] = idx_processing
+              dif._dump_json(output_dir, result_file, result)
+              idx_processing += 1
 
         end_time = time.time()
         time_elapsed = np.round(end_time - start_time, 4)
@@ -118,6 +136,13 @@ class dif:
                         print("Image deletion canceled.")
                 else:
                     dif._delete_imgs(set(lower_quality))
+
+    def _dump_json(dir, result_file, result):
+      if not os.path.exists(dir):
+          os.makedirs(dir)
+
+      with open(os.path.join(dir, result_file), "w") as file:
+          json.dump(result, file)
 
     # Function that validates the input parameters of DifPy
     def _validate_parameters(show_output, show_progress, similarity, px_size, delete, silent_del):
@@ -539,8 +564,8 @@ if __name__ == "__main__":
     parser.add_argument("-Z", "--output_directory", type=str, help='(optional) Output directory for the difPy result files. Default is working dir.', required=False, nargs='?', default=None)
     parser.add_argument("-s", "--similarity", type=type_str_int, help='(optional) Similarity grade.', required=False, nargs='?', default='normal')
     parser.add_argument("-px", "--px_size", type=int, help='(optional) Compression size of images in pixels.', required=False, nargs='?', default=50)
-    parser.add_argument("-p", "--show_progress", type=bool, help='(optional) Shows the real-time progress of difPy.', required=False, nargs='?', choices=[True, False], default=True)
-    parser.add_argument("-o", "--show_output", type=bool, help='(optional) Shows the comapred images in real-time.', required=False, nargs='?', choices=[True, False], default=False)
+    parser.add_argument("-p", "--show_progress", type=bool, help='(optional) Shows the real-time progress of difPy.', required=False, nargs='?', choices=[True, False], default=False)
+    parser.add_argument("-o", "--show_output", type=bool, help='(optional) Shows the comapred images in real-time.', required=False, nargs='?', choices=[True, False], default=True)
     parser.add_argument("-d", "--delete", type=bool, help='(optional) Deletes all duplicate images with lower quality.', required=False, nargs='?', choices=[True, False], default=False)
     parser.add_argument("-D", "--silent_del", type=bool, help='(optional) Supresses the user confirmation when deleting images.', required=False, nargs='?', choices=[True, False], default=False)
     parser.add_argument("-F", "--file", type=str, help='Text file with a list of images to check.', required=True)
@@ -550,29 +575,30 @@ if __name__ == "__main__":
     search = dif(file=args.file, directory_A=args.directory_A, directory_B=args.directory_B,
                  similarity=args.similarity, px_size=args.px_size, 
                  show_output=args.show_output, show_progress=args.show_progress, 
-                 delete=args.delete, silent_del=args.silent_del)
+                 delete=args.delete, silent_del=args.silent_del, output_dir="output")
 
     # create filenames for the output files
-    timestamp =str(time.time()).replace(".", "_")
-    result_file = "difPy_results_" + timestamp + ".json"
-    lq_file = "difPy_lower_quality_" + timestamp + ".txt"
-    stats_file = "difPy_stats_" + timestamp + ".json"
+    # timestamp =str(time.time()).replace(".", "_")
+    # result_file = "difPy_results_" + timestamp + ".json"
+    # lq_file = "difPy_lower_quality_" + timestamp + ".txt"
+    # stats_file = "difPy_stats_" + timestamp + ".json"
 
-    if args.output_directory != None:
-        dir = args.output_directory
-    else:
-        dir = os.getcwd()
+    # if args.output_directory != None:
+    #     dir = args.output_directory
+    # else:
+    #     dir = os.getcwd()
 
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+    # if not os.path.exists(dir):
+    #     os.makedirs(dir)
 
-    with open(os.path.join(dir, result_file), "w") as file:
-        json.dump(search.result, file)
+    # with open(os.path.join(dir, result_file), "w") as file:
+    #     json.dump(search.result, file)
 
-    with open(os.path.join(dir, lq_file), "w") as file:
-        file.writelines(search.lower_quality)
+    # with open(os.path.join(dir, lq_file), "w") as file:
+    #     file.writelines(search.lower_quality)
 
-    with open(os.path.join(dir, stats_file), "w") as file:
-        json.dump(search.stats, file)
+    # with open(os.path.join(dir, stats_file), "w") as file:
+    #     json.dump(search.stats, file)
 
-    print(f"""\nSaved difPy results into folder {dir} and filenames:\n{result_file} \n{lq_file} \n{stats_file}""")
+    # print(f"""\nSaved difPy results into folder {dir} and filenames:\n{result_file} \n{lq_file} \n{stats_file}""")
+    print("Done")
